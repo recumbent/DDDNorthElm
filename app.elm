@@ -6,6 +6,8 @@ import Html exposing (Html, Attribute, h1, h2, div, text, input)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onInput, on, keyCode)
 import Json.Decode as Json
+-- import Time exposing (Time, second)
+-- import Date
 
 
 -- MODEL
@@ -14,6 +16,7 @@ import Json.Decode as Json
 type alias Model =
     { inputText : String
     , name : String
+    -- , timeStamp : Time
     }
 
 
@@ -21,7 +24,17 @@ model : Model
 model =
     { inputText = ""
     , name = ""
+    -- , timeStamp = 0.0
     }
+
+
+
+-- INIT
+
+
+-- init : ( Model, Cmd Msg )
+-- init =
+--     ( model, Cmd.none )
 
 
 
@@ -31,16 +44,25 @@ model =
 type Msg
     = ChangeInput String
     | ChangeName
+    -- | Tick Time
 
 
 update : Msg -> { b | name : a, inputText : a } -> { b | inputText : String, name : a }
+-- update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
+--    ( (
     case msg of
         ChangeInput input ->
             { model | inputText = input }
 
         ChangeName ->
             { model | name = model.inputText, inputText = "" }
+
+    --     Tick newTime ->
+    --         { model | timeStamp = newTime }
+    --   )
+    -- , Cmd.none
+    -- )
 
 
 
@@ -60,9 +82,19 @@ onEnter msg =
 
 
 
+-- SUBSCRIPTIONS
+
+
+-- subscriptions : Model -> Sub Msg
+-- subscriptions model =
+--     Time.every second Tick
+
+
+
 -- VIEW
 
 
+-- view : Model -> Html Msg
 view : { a | inputText : String, name : String } -> Html Msg
 view model =
     div []
@@ -75,7 +107,21 @@ view model =
             ]
             []
         , h2 [] [ text ("Hello " ++ model.name ++ "!") ]
+--        , h2 [] [ text ("Hello " ++ model.name ++ "! The time is " ++ (formatTime model.timeStamp)) ]
         ]
+
+
+-- formatTime time =
+--     let
+--         date =
+--             Date.fromTime time
+--     in
+--         formatTimePart (Date.hour date) ++ ":" ++ formatTimePart (Date.minute date) ++ ":" ++ (formatTimePart (Date.second date))
+
+
+-- formatTimePart timePart =
+--     toString timePart
+--         |> String.padLeft 2 '0'
 
 
 
@@ -84,8 +130,11 @@ view model =
 
 main : Program Never Model Msg
 main =
+    -- Html.program
+    --     { init = init
     Html.beginnerProgram
         { model = model
         , view = view
         , update = update
+--        , subscriptions = subscriptions
         }
