@@ -1,0 +1,8 @@
+{
+  "name": "DDDNorthElm",
+  "version": "1.0.0",
+  "description": "Sample Elm Application for DDD North 2017",
+  "main": "app.js",
+  "author": "James Murphy <james@recumbent.co.uk>",
+  "license": "MIT"
+}
