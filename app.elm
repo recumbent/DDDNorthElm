@@ -2,21 +2,32 @@ module Main exposing (..)
 
 -- Import the things we might need
 
-import Html exposing (Html, Attribute, h1, h2, div, text, input)
+import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onInput, on, keyCode)
 import Json.Decode as Json
 import Time exposing (Time, second)
 import Date
 
-
 -- MODEL
+
+
+-- type alias Item =
+--     { id : Int
+--     , name : String
+--     , required : Bool
+--     }
+
+
+-- type alias ItemList =
+--     List Item
 
 
 type alias Model =
     { inputText : String
     , name : String
     , timeStamp : Time
+--    , items : ItemList
     }
 
 
@@ -25,6 +36,7 @@ model =
     { inputText = ""
     , name = ""
     , timeStamp = 0.0
+--    , items = []
     }
 
 
@@ -44,7 +56,8 @@ init =
 type Msg
     = ChangeInput String
     | ChangeName
-    | Tick Time
+    | Tick Time    
+--    | SelectItem
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
@@ -58,6 +71,10 @@ update msg model =
 
         Tick newTime ->
             { model | timeStamp = newTime }
+
+        -- SelectItem ->
+        --     -- Step 1 change the model but do the same thing
+        --     { model | items = { id = 0, name = model.inputText, required = True } :: model.items, inputText = "" }
       )
     , Cmd.none
     )
@@ -101,9 +118,16 @@ view model =
             , onInput ChangeInput
             , onEnter ChangeName
             , value model.inputText
-            ]
+            ]        
+        -- [ placeholder "Item to add"
+        -- , onInput ChangeInput
+        -- , onEnter SelectItem
+        -- , value model.inputText
+        -- ]
             []
         , h2 [] [ text ("Hello " ++ model.name ++ "! The time is " ++ (formatTime model.timeStamp)) ]
+        -- , ItemListView model.items
+--      --   , sortedItemListView model.items
         ]
 
 formatTime : Time -> String
@@ -119,6 +143,24 @@ formatTimePart timePart =
     toString timePart
         |> String.padLeft 2 '0'
 
+-- sortedItemListView : List Item -> Html msg
+-- sortedItemListView itemList =
+--     List.sortBy .name itemList
+--         |> itemListView
+
+
+-- itemListView : List Item -> Html msg
+-- itemListView itemList =
+--     div []
+--         [ ul []
+--             (List.map itemView itemList)
+--         ]
+
+
+-- itemView : Item -> Html msg
+-- itemView item =
+--     li [] [ text item.name ]
+
 
 
 -- MAIN
@@ -130,5 +172,5 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = (always Sub.none)
         }
