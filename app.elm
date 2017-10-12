@@ -6,8 +6,8 @@ import Html exposing (Html, Attribute, h1, h2, div, text, input)
 import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onInput, on, keyCode)
 import Json.Decode as Json
--- import Time exposing (Time, second)
--- import Date
+import Time exposing (Time, second)
+import Date
 
 
 -- MODEL
@@ -16,7 +16,7 @@ import Json.Decode as Json
 type alias Model =
     { inputText : String
     , name : String
-    -- , timeStamp : Time
+    , timeStamp : Time
     }
 
 
@@ -24,7 +24,7 @@ model : Model
 model =
     { inputText = ""
     , name = ""
-    -- , timeStamp = 0.0
+    , timeStamp = 0.0
     }
 
 
@@ -32,9 +32,9 @@ model =
 -- INIT
 
 
--- init : ( Model, Cmd Msg )
--- init =
---     ( model, Cmd.none )
+init : ( Model, Cmd Msg )
+init =
+    ( model, Cmd.none )
 
 
 
@@ -44,25 +44,23 @@ model =
 type Msg
     = ChangeInput String
     | ChangeName
-    -- | Tick Time
+    | Tick Time
 
 
-update : Msg -> { b | name : a, inputText : a } -> { b | inputText : String, name : a }
--- update : Msg -> Model -> ( Model, Cmd msg )
+update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
---    ( (
-    case msg of
+    ( (case msg of
         ChangeInput input ->
             { model | inputText = input }
 
         ChangeName ->
             { model | name = model.inputText, inputText = "" }
 
-    --     Tick newTime ->
-    --         { model | timeStamp = newTime }
-    --   )
-    -- , Cmd.none
-    -- )
+        Tick newTime ->
+            { model | timeStamp = newTime }
+      )
+    , Cmd.none
+    )
 
 
 
@@ -85,17 +83,16 @@ onEnter msg =
 -- SUBSCRIPTIONS
 
 
--- subscriptions : Model -> Sub Msg
--- subscriptions model =
---     Time.every second Tick
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Time.every second Tick
 
 
 
 -- VIEW
 
 
--- view : Model -> Html Msg
-view : { a | inputText : String, name : String } -> Html Msg
+view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Simple elm application" ]
@@ -106,22 +103,21 @@ view model =
             , value model.inputText
             ]
             []
-        , h2 [] [ text ("Hello " ++ model.name ++ "!") ]
---        , h2 [] [ text ("Hello " ++ model.name ++ "! The time is " ++ (formatTime model.timeStamp)) ]
+        , h2 [] [ text ("Hello " ++ model.name ++ "! The time is " ++ (formatTime model.timeStamp)) ]
         ]
 
+formatTime : Time -> String
+formatTime time =
+    let
+        date =
+            Date.fromTime time
+    in
+        formatTimePart (Date.hour date) ++ ":" ++ formatTimePart (Date.minute date) ++ ":" ++ (formatTimePart (Date.second date))
 
--- formatTime time =
---     let
---         date =
---             Date.fromTime time
---     in
---         formatTimePart (Date.hour date) ++ ":" ++ formatTimePart (Date.minute date) ++ ":" ++ (formatTimePart (Date.second date))
-
-
--- formatTimePart timePart =
---     toString timePart
---         |> String.padLeft 2 '0'
+formatTimePart : a -> String
+formatTimePart timePart =
+    toString timePart
+        |> String.padLeft 2 '0'
 
 
 
@@ -130,11 +126,9 @@ view model =
 
 main : Program Never Model Msg
 main =
-    -- Html.program
-    --     { init = init
-    Html.beginnerProgram
-        { model = model
+    Html.program
+        { init = init
         , view = view
         , update = update
---        , subscriptions = subscriptions
+        , subscriptions = subscriptions
         }
