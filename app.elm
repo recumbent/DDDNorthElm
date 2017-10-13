@@ -2,13 +2,14 @@ module Main exposing (..)
 
 -- Import the things we might need
 
-import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li)
-import Html.Attributes exposing (placeholder, value)
-import Html.Events exposing (onInput, on, keyCode)
+import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td)
+import Html.Attributes exposing (placeholder, value, type_, checked)
+import Html.Events exposing (onInput, on, keyCode, onCheck)
 import Json.Decode as Json
 
 
 -- MODEL
+-- Lets actually do something a bit more interesting with this model
 
 
 type alias Item =
@@ -51,6 +52,7 @@ init =
 type Msg
     = ChangeInput String
     | SelectItem
+    | ToggleRequired Int Bool
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
@@ -60,11 +62,41 @@ update msg model =
             { model | inputText = input }
 
         SelectItem ->
-            -- Step 1 change the model but do the same thing
-            { model | items = { id = 0, name = model.inputText, required = True } :: model.items, inputText = "" }
+            let
+                match =
+                    List.filter (\i -> String.contains model.inputText i.name) model.items
+                        |> List.head
+            in
+                case match of
+                    Nothing ->
+                        let
+                            maxId =
+                                Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) model.items))
+                        in
+                            { model | items = { id = maxId, name = model.inputText, required = True } :: model.items, inputText = "" }
+
+                    Just item ->
+                        { model
+                            | items = setItemRequiredState item.id True model.items
+                        }
+
+        ToggleRequired id state ->
+            { model | items = setItemRequiredState id state model.items }
       )
     , Cmd.none
     )
+
+
+setItemRequiredState : a -> b -> List { c | id : a, required : Bool } -> List { c | id : a, required : Bool }
+setItemRequiredState id state itemList =
+    List.map
+        (\i ->
+            if i.id == id then
+                { i | required = True }
+            else
+                i
+        )
+        itemList
 
 
 
@@ -98,14 +130,22 @@ view model =
             , value model.inputText
             ]
             []
-        , sortedItemListView model.items
+
+        -- , sortedItemListView model.items
+        , filteredSortedItemListView model.inputText model.items
         ]
 
 
-sortedItemListView : List Item -> Html msg
+filteredSortedItemListView : String -> List Item -> Html Msg
+filteredSortedItemListView filterText items =
+    List.filter (\i -> String.contains filterText i.name) items
+        |> sortedItemListView
+
+
+sortedItemListView : List Item -> Html Msg
 sortedItemListView itemList =
     List.sortBy .name itemList
-        |> itemListView
+        |> tableItemListView
 
 
 itemListView : List Item -> Html msg
@@ -119,6 +159,29 @@ itemListView itemList =
 itemView : Item -> Html msg
 itemView item =
     li [] [ text item.name ]
+
+
+tableItemListView : List Item -> Html Msg
+tableItemListView itemList =
+    table []
+        [ thead []
+            [ tr []
+                [ th [] [ text "ID" ]
+                , th [] [ text "Item Name" ]
+                , th [] [ text "Required?" ]
+                ]
+            ]
+        , tbody [] (List.map tableItemView itemList)
+        ]
+
+
+tableItemView : Item -> Html Msg
+tableItemView item =
+    tr []
+        [ td [] [ text (toString item.id) ]
+        , td [] [ text item.name ]
+        , td [] [ input [ type_ "checkbox", (checked item.required), onCheck (ToggleRequired item.id) ] [] ]
+        ]
 
 
 
