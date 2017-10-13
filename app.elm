@@ -6,9 +6,14 @@ import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, 
 import Html.Attributes exposing (placeholder, value, type_, checked)
 import Html.Events exposing (onInput, on, keyCode, onCheck)
 import Json.Decode as Json
+import Json.Decode.Pipeline as Pipeline
+import Json.Encode as Encode
+import RemoteData exposing (..)
+import Http exposing (Error)
 
 
 -- MODEL
+
 
 type alias Item =
     { id : Int
@@ -23,14 +28,14 @@ type alias ItemList =
 
 type alias Model =
     { inputText : String
-    , items : ItemList
+    , items : RemoteData Error ItemList
     }
 
 
 model : Model
 model =
     { inputText = ""
-    , items = []
+    , items = Success []
     }
 
 
@@ -55,35 +60,33 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
-    ( (case msg of
+    case msg of
         ChangeInput input ->
-            { model | inputText = input }
+            ({ model | inputText = input }, Cmd.none)
 
         SelectItem ->
-            let
-                match =
-                    List.filter (\i -> String.contains model.inputText i.name) model.items
-                        |> List.head
-            in
-                case match of
-                    Nothing ->
-                        let
-                            maxId =
-                                Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) model.items))
-                        in
-                            { model | items = { id = maxId + 1, name = model.inputText, required = True } :: model.items, inputText = "" }
-
-                    Just item ->
-                        { model
-                            | items = setItemRequiredState item.id True model.items
-                            , inputText = ""
-                        }
+            ({ model | items = (RemoteData.map (doSelectItem model.inputText) model.items), inputText = ""}, Cmd.none)                
 
         ToggleRequired id state ->
-            { model | items = setItemRequiredState id state model.items }
-      )
-    , Cmd.none
-    )
+            ({ model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }, Cmd.none)
+
+doSelectItem : String -> List Item -> List Item
+doSelectItem inputText itemList =
+    let
+        match =
+            List.filter (\i -> String.contains inputText i.name) itemList
+                |> List.head
+    in
+        case match of
+            Nothing ->
+                let
+                    maxId =
+                        Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) itemList))
+                in
+                    ({ id = maxId + 1, name = inputText, required = True } :: itemList)
+
+            Just item ->
+                setItemRequiredState item.id True itemList
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
@@ -121,28 +124,37 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Simple elm application" ]
-        , input
+        , case model.items of
+            NotAsked ->
+                h2 [] [ text "Should never see this" ] 
+
+            Loading ->
+                h2 [] [ text "Loading items..." ]
+                
+            Failure err ->
+                h2 [] [ text ("HTTP Failure: " ++ (toString err)) ]
+
+            Success items ->
+                successView model.inputText items 
+        ]
+
+successView : String -> List Item -> Html Msg
+successView inputText items =
+    div []
+        [ input
             [ placeholder "Item to add"
             , onInput ChangeInput
             , onEnter SelectItem
-            , value model.inputText
+            , value inputText
             ]
             []
-
-        -- , sortedItemListView model.items
-        , filteredSortedItemListView model.inputText model.items
+        , filteredSortedItemListView inputText items
         ]
-
 
 filteredSortedItemListView : String -> List Item -> Html Msg
 filteredSortedItemListView filterText items =
     List.filter (\i -> String.contains filterText i.name) items
-        |> sortedItemListView
-
-
-sortedItemListView : List Item -> Html Msg
-sortedItemListView itemList =
-    List.sortBy .name itemList
+        |> List.sortBy .name
         |> itemListView
 
 itemListView : List Item -> Html Msg
