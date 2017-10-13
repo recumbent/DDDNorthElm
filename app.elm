@@ -9,8 +9,6 @@ import Json.Decode as Json
 
 
 -- MODEL
--- Lets actually do something a bit more interesting with this model
-
 
 type alias Item =
     { id : Int
@@ -73,11 +71,12 @@ update msg model =
                             maxId =
                                 Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) model.items))
                         in
-                            { model | items = { id = maxId, name = model.inputText, required = True } :: model.items, inputText = "" }
+                            { model | items = { id = maxId + 1, name = model.inputText, required = True } :: model.items, inputText = "" }
 
                     Just item ->
                         { model
                             | items = setItemRequiredState item.id True model.items
+                            , inputText = ""
                         }
 
         ToggleRequired id state ->
@@ -86,13 +85,12 @@ update msg model =
     , Cmd.none
     )
 
-
-setItemRequiredState : a -> b -> List { c | id : a, required : Bool } -> List { c | id : a, required : Bool }
+setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
     List.map
         (\i ->
             if i.id == id then
-                { i | required = True }
+                { i | required = state }
             else
                 i
         )
@@ -145,24 +143,10 @@ filteredSortedItemListView filterText items =
 sortedItemListView : List Item -> Html Msg
 sortedItemListView itemList =
     List.sortBy .name itemList
-        |> tableItemListView
+        |> itemListView
 
-
-itemListView : List Item -> Html msg
+itemListView : List Item -> Html Msg
 itemListView itemList =
-    div []
-        [ ul []
-            (List.map itemView itemList)
-        ]
-
-
-itemView : Item -> Html msg
-itemView item =
-    li [] [ text item.name ]
-
-
-tableItemListView : List Item -> Html Msg
-tableItemListView itemList =
     table []
         [ thead []
             [ tr []
@@ -171,12 +155,12 @@ tableItemListView itemList =
                 , th [] [ text "Required?" ]
                 ]
             ]
-        , tbody [] (List.map tableItemView itemList)
+        , tbody [] (List.map itemView itemList)
         ]
 
 
-tableItemView : Item -> Html Msg
-tableItemView item =
+itemView : Item -> Html Msg
+itemView item =
     tr []
         [ td [] [ text (toString item.id) ]
         , td [] [ text item.name ]
