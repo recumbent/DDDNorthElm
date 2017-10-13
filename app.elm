@@ -54,8 +54,14 @@ init =
 -- COMMANDS
 
 
+serverUrl : String
 serverUrl =
     "http://127.0.0.1:4000/items"
+
+
+itemUrl : a -> String
+itemUrl id =
+    String.join "/" [ serverUrl, (toString id) ]
 
 
 getItemList : Cmd Msg
@@ -77,35 +83,63 @@ itemDecoder =
         |> Pipeline.required "name" Json.string
         |> Pipeline.required "required" Json.bool
 
--- itemUrl : a -> String
--- itemUrl id = 
---     String.join "/" [ serverUrl, (toString id) ]
 
--- setItemStateRequest : a -> Bool -> Http.Request Item
--- setItemStateRequest id state =
---     Http.request
---         { body = itemStateEncoder state |> Http.jsonBody
---         , expect = Http.expectJson itemDecoder
---         , headers = []
---         , method = "PATCH"
---         , timeout = Nothing
---         , url = itemUrl id
---         , withCredentials = False
---         }
+setItemStateRequest : a -> Bool -> Http.Request Item
+setItemStateRequest id state =
+    Http.request
+        { body = itemStateEncoder state |> Http.jsonBody
+        , expect = Http.expectJson itemDecoder
+        , headers = []
+        , method = "PATCH"
+        , timeout = Nothing
+        , url = itemUrl id
+        , withCredentials = False
+        }
 
--- itemStateEncoder : Bool -> Encode.Value
--- itemStateEncoder required =
+
+itemStateEncoder : Bool -> Encode.Value
+itemStateEncoder required =
+    let
+        attributes =
+            [ ( "required", Encode.bool required ) ]
+    in
+        Encode.object attributes
+
+
+setItemStateCmd : a -> Bool -> Cmd Msg
+setItemStateCmd id state =
+    setItemStateRequest id state
+        |> RemoteData.sendRequest
+        |> Cmd.map OnSetItemState
+
+
+-- newItemCmd : { a | id : Int, name : String, required : Bool } -> Cmd Msg
+-- newItemCmd item =
+--     newItemRequest item
+--         |> RemoteData.sendRequest
+--         |> Cmd.map OnNewItem
+
+
+-- newItemRequest : { a | id : Int, name : String, required : Bool } -> Http.Request Item
+-- newItemRequest item =
 --     let
---         attributes = 
---             [ ("required", Encode.bool required ) ]
+--         itemBody =
+--             itemEncoder item |> Http.jsonBody
+--     in
+--         Http.post serverUrl itemBody itemDecoder
+
+
+-- itemEncoder : { a | id : Int, name : String, required : Bool } -> Encode.Value
+-- itemEncoder item =
+--     let
+--         attributes =
+--             [ ( "id", Encode.int item.id )
+--             , ( "name", Encode.string item.name )
+--             , ( "required", Encode.bool item.required )
+--             ]
 --     in
 --         Encode.object attributes
-        
--- setItemStateCmd : a -> Bool -> Cmd Msg
--- setItemStateCmd id state =
---     setItemStateRequest id state
---     |> RemoteData.sendRequest
---     |> Cmd.map OnSetItemState
+
 
 
 -- UPDATE
@@ -116,7 +150,8 @@ type Msg
     | SelectItem
     | ToggleRequired Int Bool
     | ItemsResponse (RemoteData Error ItemList)
---    | OnSetItemState (RemoteData Error Item)
+    | OnSetItemState (RemoteData Error Item)
+--    | OnNewItem (RemoteData Error Item)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -127,19 +162,51 @@ update msg model =
 
         SelectItem ->
             ( { model | items = (RemoteData.map (doSelectItem model.inputText) model.items), inputText = "" }, Cmd.none )
+        
+            -- case model.items of
+            --     Success itemList ->
+            --         let
+            --             match =
+            --                 List.filter (\i -> String.contains model.inputText i.name) itemList
+            --                     |> List.head
+            --         in
+            --             case match of
+            --                 Nothing ->
+            --                     let
+            --                         maxId =
+            --                             Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) itemList))
+
+            --                         newItem =
+            --                             { id = maxId + 1, name = model.inputText, required = True }
+            --                     in
+            --                         ( { model | items = Success (newItem :: itemList), inputText = "" }
+            --                         , newItemCmd newItem
+            --                         )
+
+            --                 Just item ->
+            --                     ( { model | items = RemoteData.map (\items -> setItemRequiredState item.id True items) model.items }
+            --                     , (setItemStateCmd item.id True)
+            --                     )
+
+            --     _ ->
+            --         ( model
+            --         , Cmd.none
+            --         )
 
         ToggleRequired id state ->
-            ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }, Cmd.none )
-        
-            -- ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }
-            -- , (setItemStateCmd id state)
-            -- )
+            ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }
+            , (setItemStateCmd id state)
+            )
 
         ItemsResponse responseData ->
             ( { model | items = responseData }, Cmd.none )
 
-        -- OnSetItemState responseData ->
-        --     (model, Cmd.none)
+        OnSetItemState responseData ->
+            ( model, Cmd.none )
+
+        -- OnNewItem responseData ->
+        --     ( model, Cmd.none )
+
 
 doSelectItem : String -> List Item -> List Item
 doSelectItem inputText itemList =
