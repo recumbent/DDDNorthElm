@@ -35,8 +35,7 @@ type alias Model =
 model : Model
 model =
     { inputText = ""
-    , items = Success []
---    , items = Loading
+    , items = Loading
     }
 
 
@@ -46,39 +45,37 @@ model =
 
 init : ( Model, Cmd Msg )
 init =
-    ( model, Cmd.none )
-
-    -- ( model
-    -- , getItemList
-    -- )
+    ( model
+    , getItemList
+    )
 
 
 
 -- COMMANDS
 
 
--- serverUrl =
---     "http://127.0.0.1:4000/items"
+serverUrl =
+    "http://127.0.0.1:4000/items"
 
 
--- getItemList : Cmd Msg
--- getItemList =
---     Http.get serverUrl decodeItems
---         |> RemoteData.sendRequest
---         |> Cmd.map ItemsResponse
+getItemList : Cmd Msg
+getItemList =
+    Http.get serverUrl decodeItems
+        |> RemoteData.sendRequest
+        |> Cmd.map ItemsResponse
 
 
--- decodeItems : Json.Decoder (List Item)
--- decodeItems =
---     (Json.list itemDecoder)
+decodeItems : Json.Decoder (List Item)
+decodeItems =
+    (Json.list itemDecoder)
 
 
--- itemDecoder : Json.Decoder Item
--- itemDecoder =
---     Pipeline.decode Item
---         |> Pipeline.required "id" Json.int
---         |> Pipeline.required "name" Json.string
---         |> Pipeline.required "required" Json.bool
+itemDecoder : Json.Decoder Item
+itemDecoder =
+    Pipeline.decode Item
+        |> Pipeline.required "id" Json.int
+        |> Pipeline.required "name" Json.string
+        |> Pipeline.required "required" Json.bool
 
 
 
@@ -89,7 +86,7 @@ type Msg
     = ChangeInput String
     | SelectItem
     | ToggleRequired Int Bool
---    | ItemsResponse (RemoteData Error ItemList)
+    | ItemsResponse (RemoteData Error ItemList)
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
@@ -104,8 +101,8 @@ update msg model =
         ToggleRequired id state ->
             ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }, Cmd.none )
 
-        -- ItemsResponse responseData ->
-        --     ( { model | items = responseData }, Cmd.none )
+        ItemsResponse responseData ->
+            ( { model | items = responseData }, Cmd.none )
 
 
 doSelectItem : String -> List Item -> List Item
