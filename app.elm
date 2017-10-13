@@ -36,6 +36,7 @@ model : Model
 model =
     { inputText = ""
     , items = Success []
+--    , items = Loading
     }
 
 
@@ -47,6 +48,38 @@ init : ( Model, Cmd Msg )
 init =
     ( model, Cmd.none )
 
+    -- ( model
+    -- , getItemList
+    -- )
+
+
+
+-- COMMANDS
+
+
+-- serverUrl =
+--     "http://127.0.0.1:4000/items"
+
+
+-- getItemList : Cmd Msg
+-- getItemList =
+--     Http.get serverUrl decodeItems
+--         |> RemoteData.sendRequest
+--         |> Cmd.map ItemsResponse
+
+
+-- decodeItems : Json.Decoder (List Item)
+-- decodeItems =
+--     (Json.list itemDecoder)
+
+
+-- itemDecoder : Json.Decoder Item
+-- itemDecoder =
+--     Pipeline.decode Item
+--         |> Pipeline.required "id" Json.int
+--         |> Pipeline.required "name" Json.string
+--         |> Pipeline.required "required" Json.bool
+
 
 
 -- UPDATE
@@ -56,19 +89,24 @@ type Msg
     = ChangeInput String
     | SelectItem
     | ToggleRequired Int Bool
+--    | ItemsResponse (RemoteData Error ItemList)
 
 
 update : Msg -> Model -> ( Model, Cmd msg )
 update msg model =
     case msg of
         ChangeInput input ->
-            ({ model | inputText = input }, Cmd.none)
+            ( { model | inputText = input }, Cmd.none )
 
         SelectItem ->
-            ({ model | items = (RemoteData.map (doSelectItem model.inputText) model.items), inputText = ""}, Cmd.none)                
+            ( { model | items = (RemoteData.map (doSelectItem model.inputText) model.items), inputText = "" }, Cmd.none )
 
         ToggleRequired id state ->
-            ({ model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }, Cmd.none)
+            ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }, Cmd.none )
+
+        -- ItemsResponse responseData ->
+        --     ( { model | items = responseData }, Cmd.none )
+
 
 doSelectItem : String -> List Item -> List Item
 doSelectItem inputText itemList =
@@ -87,6 +125,7 @@ doSelectItem inputText itemList =
 
             Just item ->
                 setItemRequiredState item.id True itemList
+
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
@@ -126,17 +165,18 @@ view model =
         [ h1 [] [ text "Simple elm application" ]
         , case model.items of
             NotAsked ->
-                h2 [] [ text "Should never see this" ] 
+                h2 [] [ text "Should never see this" ]
 
             Loading ->
                 h2 [] [ text "Loading items..." ]
-                
+
             Failure err ->
                 h2 [] [ text ("HTTP Failure: " ++ (toString err)) ]
 
             Success items ->
-                successView model.inputText items 
+                successView model.inputText items
         ]
+
 
 successView : String -> List Item -> Html Msg
 successView inputText items =
@@ -151,11 +191,13 @@ successView inputText items =
         , filteredSortedItemListView inputText items
         ]
 
+
 filteredSortedItemListView : String -> List Item -> Html Msg
 filteredSortedItemListView filterText items =
     List.filter (\i -> String.contains filterText i.name) items
         |> List.sortBy .name
         |> itemListView
+
 
 itemListView : List Item -> Html Msg
 itemListView itemList =
