@@ -77,6 +77,35 @@ itemDecoder =
         |> Pipeline.required "name" Json.string
         |> Pipeline.required "required" Json.bool
 
+-- itemUrl : a -> String
+-- itemUrl id = 
+--     String.join "/" [ serverUrl, (toString id) ]
+
+-- setItemStateRequest : a -> Bool -> Http.Request Item
+-- setItemStateRequest id state =
+--     Http.request
+--         { body = itemStateEncoder state |> Http.jsonBody
+--         , expect = Http.expectJson itemDecoder
+--         , headers = []
+--         , method = "PATCH"
+--         , timeout = Nothing
+--         , url = itemUrl id
+--         , withCredentials = False
+--         }
+
+-- itemStateEncoder : Bool -> Encode.Value
+-- itemStateEncoder required =
+--     let
+--         attributes = 
+--             [ ("required", Encode.bool required ) ]
+--     in
+--         Encode.object attributes
+        
+-- setItemStateCmd : a -> Bool -> Cmd Msg
+-- setItemStateCmd id state =
+--     setItemStateRequest id state
+--     |> RemoteData.sendRequest
+--     |> Cmd.map OnSetItemState
 
 
 -- UPDATE
@@ -87,9 +116,10 @@ type Msg
     | SelectItem
     | ToggleRequired Int Bool
     | ItemsResponse (RemoteData Error ItemList)
+--    | OnSetItemState (RemoteData Error Item)
 
 
-update : Msg -> Model -> ( Model, Cmd msg )
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ChangeInput input ->
@@ -100,10 +130,16 @@ update msg model =
 
         ToggleRequired id state ->
             ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }, Cmd.none )
+        
+            -- ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }
+            -- , (setItemStateCmd id state)
+            -- )
 
         ItemsResponse responseData ->
             ( { model | items = responseData }, Cmd.none )
 
+        -- OnSetItemState responseData ->
+        --     (model, Cmd.none)
 
 doSelectItem : String -> List Item -> List Item
 doSelectItem inputText itemList =
