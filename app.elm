@@ -10,6 +10,8 @@ import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
 import RemoteData exposing (..)
 import Http exposing (Error)
+import Json.Decode exposing (Decoder, decodeValue, succeed, string)
+import Aisle exposing (..)
 
 
 -- MODEL
@@ -19,6 +21,8 @@ type alias Item =
     { id : Int
     , name : String
     , required : Bool
+    , purchased : Bool
+    , aisle : Aisle
     }
 
 
@@ -82,6 +86,8 @@ itemDecoder =
         |> Pipeline.required "id" Json.int
         |> Pipeline.required "name" Json.string
         |> Pipeline.required "required" Json.bool
+        |> Pipeline.required "purchased" Json.bool
+        |> Pipeline.optional "aisle" aisleDecoder None
 
 
 setItemStateRequest : a -> Bool -> Http.Request Item
@@ -101,7 +107,9 @@ itemStateEncoder : Bool -> Encode.Value
 itemStateEncoder required =
     let
         attributes =
-            [ ( "required", Encode.bool required ) ]
+            [ ( "required", Encode.bool required )
+            , ( "purchased", Encode.bool False )
+            ]
     in
         Encode.object attributes
 
@@ -113,32 +121,41 @@ setItemStateCmd id state =
         |> Cmd.map OnSetItemState
 
 
--- newItemCmd : { a | id : Int, name : String, required : Bool } -> Cmd Msg
--- newItemCmd item =
---     newItemRequest item
---         |> RemoteData.sendRequest
---         |> Cmd.map OnNewItem
+newItemCmd : Item -> Cmd Msg
+newItemCmd item =
+    newItemRequest item
+        |> RemoteData.sendRequest
+        |> Cmd.map OnNewItem
 
 
--- newItemRequest : { a | id : Int, name : String, required : Bool } -> Http.Request Item
--- newItemRequest item =
---     let
---         itemBody =
---             itemEncoder item |> Http.jsonBody
---     in
---         Http.post serverUrl itemBody itemDecoder
+newItemRequest : Item -> Http.Request Item
+newItemRequest item =
+    let
+        itemBody =
+            itemEncoder item |> Http.jsonBody
+    in
+        Http.post serverUrl itemBody itemDecoder
 
 
--- itemEncoder : { a | id : Int, name : String, required : Bool } -> Encode.Value
--- itemEncoder item =
---     let
---         attributes =
---             [ ( "id", Encode.int item.id )
---             , ( "name", Encode.string item.name )
---             , ( "required", Encode.bool item.required )
---             ]
---     in
---         Encode.object attributes
+itemEncoder : Item -> Encode.Value
+itemEncoder item =
+    let
+        attributes =
+            [ ( "id", Encode.int item.id )
+            , ( "name", Encode.string item.name )
+            , ( "required", Encode.bool item.required )
+            , ( "purchased", Encode.bool item.purchased )
+            , ( "aisle"
+              , case item.aisle of
+                    None ->
+                        Encode.int 0
+
+                    Number n ->
+                        Encode.int n
+              )
+            ]
+    in
+        Encode.object attributes
 
 
 
@@ -151,7 +168,7 @@ type Msg
     | ToggleRequired Int Bool
     | ItemsResponse (RemoteData Error ItemList)
     | OnSetItemState (RemoteData Error Item)
---    | OnNewItem (RemoteData Error Item)
+    | OnNewItem (RemoteData Error Item)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -161,37 +178,36 @@ update msg model =
             ( { model | inputText = input }, Cmd.none )
 
         SelectItem ->
-            ( { model | items = (RemoteData.map (doSelectItem model.inputText) model.items), inputText = "" }, Cmd.none )
-        
-            -- case model.items of
-            --     Success itemList ->
-            --         let
-            --             match =
-            --                 List.filter (\i -> String.contains model.inputText i.name) itemList
-            --                     |> List.head
-            --         in
-            --             case match of
-            --                 Nothing ->
-            --                     let
-            --                         maxId =
-            --                             Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) itemList))
+            case model.items of
+                Success itemList ->
+                    let
+                        match =
+                            List.filter (\i -> String.contains model.inputText i.name) itemList
+                                |> List.head
+                    in
+                        case match of
+                            Nothing ->
+                                let
+                                    maxId =
+                                        Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) itemList))
 
-            --                         newItem =
-            --                             { id = maxId + 1, name = model.inputText, required = True }
-            --                     in
-            --                         ( { model | items = Success (newItem :: itemList), inputText = "" }
-            --                         , newItemCmd newItem
-            --                         )
+                                    newItem : Item
+                                    newItem =
+                                        { id = maxId + 1, name = model.inputText, required = True, purchased = False, aisle = None }
+                                in
+                                    ( { model | items = Success (newItem :: itemList), inputText = "" }
+                                    , newItemCmd newItem
+                                    )
 
-            --                 Just item ->
-            --                     ( { model | items = RemoteData.map (\items -> setItemRequiredState item.id True items) model.items }
-            --                     , (setItemStateCmd item.id True)
-            --                     )
+                            Just item ->
+                                ( { model | items = RemoteData.map (\items -> setItemRequiredState item.id True items) model.items }
+                                , (setItemStateCmd item.id True)
+                                )
 
-            --     _ ->
-            --         ( model
-            --         , Cmd.none
-            --         )
+                _ ->
+                    ( model
+                    , Cmd.none
+                    )
 
         ToggleRequired id state ->
             ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }
@@ -204,27 +220,8 @@ update msg model =
         OnSetItemState responseData ->
             ( model, Cmd.none )
 
-        -- OnNewItem responseData ->
-        --     ( model, Cmd.none )
-
-
-doSelectItem : String -> List Item -> List Item
-doSelectItem inputText itemList =
-    let
-        match =
-            List.filter (\i -> String.contains inputText i.name) itemList
-                |> List.head
-    in
-        case match of
-            Nothing ->
-                let
-                    maxId =
-                        Maybe.withDefault 0 (List.maximum (List.map (\i -> i.id) itemList))
-                in
-                    ({ id = maxId + 1, name = inputText, required = True } :: itemList)
-
-            Just item ->
-                setItemRequiredState item.id True itemList
+        OnNewItem responseData ->
+            ( model, Cmd.none )
 
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }

@@ -3,7 +3,6 @@
         {
             "id": 1,
             "name": "Bread",
-            "aisle" : null,
             "required" : false,
             "purchased" : false,
             "aisle" : null
@@ -11,7 +10,6 @@
         {
             "id": 2,
             "name": "Butter",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
@@ -19,7 +17,6 @@
         {
             "id": 3,
             "name": "Milk",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
@@ -27,7 +24,6 @@
         {
             "id": 4,
             "name": "Tea",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
@@ -35,7 +31,6 @@
         {
             "id": 5,
             "name": "Coffee",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
@@ -43,7 +38,6 @@
         {
             "id": 6,
             "name": "Sugar",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
@@ -51,7 +45,6 @@
         {
             "id": 7,
             "name": "Marmite",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
@@ -59,7 +52,6 @@
         {
             "id": 8,
             "name": "Beer",
-            "aisle" : null,
             "required": false,
             "purchased" : false,
             "aisle" : null
