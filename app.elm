@@ -2,9 +2,9 @@ module Main exposing (..)
 
 -- Import the things we might need
 
-import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td)
+import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset)
 import Html.Attributes exposing (placeholder, value, type_, checked)
-import Html.Events exposing (onInput, on, keyCode, onCheck)
+import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
 import Json.Decode as Json
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
@@ -15,6 +15,11 @@ import Aisle exposing (..)
 
 
 -- MODEL
+
+
+type Views
+    = ItemList
+    | ShoppingList
 
 
 type alias Item =
@@ -31,14 +36,16 @@ type alias ItemList =
 
 
 type alias Model =
-    { inputText : String
+    { currentView : Views
+    , inputText : String
     , items : RemoteData Error ItemList
     }
 
 
 model : Model
 model =
-    { inputText = ""
+    { currentView = ItemList
+    , inputText = ""
     , items = Loading
     }
 
@@ -114,9 +121,39 @@ itemStateEncoder required =
         Encode.object attributes
 
 
+itemPurchasedStateEncoder : Bool -> Encode.Value
+itemPurchasedStateEncoder purchased =
+    let
+        attributes =
+            [ ( "purchased", Encode.bool purchased )
+            ]
+    in
+        Encode.object attributes
+
+
 setItemStateCmd : a -> Bool -> Cmd Msg
 setItemStateCmd id state =
     setItemStateRequest id state
+        |> RemoteData.sendRequest
+        |> Cmd.map OnSetItemState
+
+
+setItemPurchasedStateRequest : a -> Bool -> Http.Request Item
+setItemPurchasedStateRequest id state =
+    Http.request
+        { body = itemPurchasedStateEncoder state |> Http.jsonBody
+        , expect = Http.expectJson itemDecoder
+        , headers = []
+        , method = "PATCH"
+        , timeout = Nothing
+        , url = itemUrl id
+        , withCredentials = False
+        }
+
+
+setItemPurchasedStateCmd : a -> Bool -> Cmd Msg
+setItemPurchasedStateCmd id state =
+    setItemPurchasedStateRequest id state
         |> RemoteData.sendRequest
         |> Cmd.map OnSetItemState
 
@@ -169,6 +206,8 @@ type Msg
     | ItemsResponse (RemoteData Error ItemList)
     | OnSetItemState (RemoteData Error Item)
     | OnNewItem (RemoteData Error Item)
+    | SelectView Views
+    | TogglePurchased Int Bool
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -223,6 +262,14 @@ update msg model =
         OnNewItem responseData ->
             ( model, Cmd.none )
 
+        SelectView newView ->
+            ( { model | currentView = newView }, Cmd.none )
+
+        TogglePurchased id state ->
+            ( { model | items = RemoteData.map (\items -> setItemPurchasedState id state items) model.items }
+            , (setItemPurchasedStateCmd id state)
+            )
+
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
@@ -230,6 +277,18 @@ setItemRequiredState id state itemList =
         (\i ->
             if i.id == id then
                 { i | required = state }
+            else
+                i
+        )
+        itemList
+
+
+setItemPurchasedState : a -> b -> List { c | id : a, purchased : b } -> List { c | id : a, purchased : b }
+setItemPurchasedState id state itemList =
+    List.map
+        (\i ->
+            if i.id == id then
+                { i | purchased = state }
             else
                 i
         )
@@ -260,6 +319,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "Simple elm application" ]
+        , viewSelector model.currentView
         , case model.items of
             NotAsked ->
                 h2 [] [ text "Should never see this" ]
@@ -271,12 +331,26 @@ view model =
                 h2 [] [ text ("HTTP Failure: " ++ (toString err)) ]
 
             Success items ->
-                successView model.inputText items
+                successView model
         ]
 
 
-successView : String -> List Item -> Html Msg
-successView inputText items =
+successView : Model -> Html Msg
+successView model =
+    let
+        items =
+            RemoteData.withDefault [] model.items
+    in
+        case model.currentView of
+            ItemList ->
+                itemsView model.inputText items
+
+            ShoppingList ->
+                shoppingView items
+
+
+itemsView : String -> List Item -> Html Msg
+itemsView inputText items =
     div []
         [ input
             [ placeholder "Item to add"
@@ -316,6 +390,65 @@ itemView item =
         [ td [] [ text (toString item.id) ]
         , td [] [ text item.name ]
         , td [] [ input [ type_ "checkbox", (checked item.required), onCheck (ToggleRequired item.id) ] [] ]
+        ]
+
+
+shoppingView : List Item -> Html Msg
+shoppingView items =
+    List.filter (\i -> i.required) items
+        |> shoppingListView
+
+
+shoppingListView : List Item -> Html Msg
+shoppingListView items =
+    table []
+        [ thead []
+            [ tr []
+                [ th [] [ text "Purchased?" ]
+                , th [] [ text "Item Name" ]
+                , th [] [ text "Aisle" ]
+                ]
+            ]
+        , tbody [] (List.map shoppingItemView items)
+        ]
+
+
+shoppingItemView : Item -> Html Msg
+shoppingItemView item =
+    tr []
+        [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
+        , td [] [ text item.name ]
+        , td [] [ aisleView item.aisle ]
+        ]
+
+
+aisleView : Aisle -> Html msg
+aisleView aisle =
+    let
+        aisleText =
+            case aisle of
+                None ->
+                    " - "
+
+                Number n ->
+                    toString n
+    in
+        text aisleText
+
+
+viewSelector : Views -> Html Msg
+viewSelector currentView =
+    fieldset []
+        [ radio (SelectView ItemList) "Pick Items" (currentView == ItemList)
+        , radio (SelectView ShoppingList) "Shop!" (currentView == ShoppingList)
+        ]
+
+
+radio : msg -> String -> Bool -> Html msg
+radio msg name isChecked =
+    label []
+        [ input [ type_ "radio", onClick msg, (checked isChecked) ] []
+        , text name
         ]
 
 
