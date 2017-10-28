@@ -400,6 +400,7 @@ shoppingView items =
         |> List.sortWith shoppingCompare
         |> shoppingListView
 
+
 shoppingCompare : Item -> Item -> Order
 shoppingCompare a b =
     let
@@ -415,11 +416,13 @@ shoppingCompare a b =
                     case aisleComp of
                         EQ ->
                             compare (String.toLower a.name) (String.toLower b.name)
+
                         _ ->
                             aisleComp
 
             _ ->
                 comp
+
 
 boolCompare : Bool -> Bool -> Order
 boolCompare a b =
@@ -432,6 +435,7 @@ boolCompare a b =
         GT
     else
         EQ
+
 
 aisleCompare : Aisle -> Aisle -> Order
 aisleCompare a b =
@@ -463,17 +467,27 @@ shoppingListView items =
                 , th [] [ text "Aisle" ]
                 ]
             ]
-        , Keyed.node "tbody" [] (List.map (\i -> ((toString i.id), (shoppingItemView i))) items)
+        , Keyed.node "tbody" [] (List.map (\i -> ( (toString i.id), (shoppingItemView i) )) items)
         ]
 
 
 shoppingItemView : Item -> Html Msg
 shoppingItemView item =
-    tr []
-        [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
-        , td [] [ text item.name ]
-        , td [] [ aisleView item.aisle ]
-        ]
+    let
+        textDecor =
+            if item.purchased then
+                "line-through"
+            else
+                "none"
+
+        nameStyle =
+            style [ ( "text-decoration", textDecor ) ]
+    in
+        tr []
+            [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
+            , td [ nameStyle ] [ text item.name ]
+            , td [] [ aisleView item.aisle ]
+            ]
 
 
 aisleView : Aisle -> Html msg
