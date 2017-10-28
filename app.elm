@@ -3,7 +3,7 @@ module Main exposing (..)
 -- Import the things we might need
 
 import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset)
-import Html.Attributes exposing (placeholder, value, type_, checked)
+import Html.Attributes exposing (placeholder, value, type_, checked, style)
 import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
 import Json.Decode as Json
 import Json.Decode.Pipeline as Pipeline
@@ -396,7 +396,60 @@ itemView item =
 shoppingView : List Item -> Html Msg
 shoppingView items =
     List.filter (\i -> i.required) items
+        |> List.sortWith shoppingCompare
         |> shoppingListView
+
+shoppingCompare : Item -> Item -> Order
+shoppingCompare a b =
+    let
+        comp =
+            boolCompare a.purchased b.purchased
+    in
+        case comp of
+            EQ ->
+                let
+                    aisleComp =
+                        aisleCompare a.aisle b.aisle
+                in
+                    case aisleComp of
+                        EQ ->
+                            compare (String.toLower a.name) (String.toLower b.name)
+                        _ ->
+                            aisleComp
+
+            _ ->
+                comp
+
+boolCompare : Bool -> Bool -> Order
+boolCompare a b =
+    if not a then
+        if not b then
+            EQ
+        else
+            LT
+    else if not b then
+        GT
+    else
+        EQ
+
+aisleCompare : Aisle -> Aisle -> Order
+aisleCompare a b =
+    case a of
+        None ->
+            case b of
+                None ->
+                    EQ
+
+                _ ->
+                    LT
+
+        Number an ->
+            case b of
+                None ->
+                    LT
+
+                Number bn ->
+                    compare an bn
 
 
 shoppingListView : List Item -> Html Msg
