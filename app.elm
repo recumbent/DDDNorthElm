@@ -2,7 +2,7 @@ module Main exposing (..)
 
 -- Import the things we might need
 
-import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset)
+import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset, button)
 import Html.Attributes exposing (placeholder, value, type_, checked, style)
 import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
 import Html.Keyed as Keyed
@@ -209,6 +209,8 @@ type Msg
     | OnNewItem (RemoteData Error Item)
     | SelectView Views
     | TogglePurchased Int Bool
+    | IncAisle Int
+    | DecAisle Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -250,7 +252,7 @@ update msg model =
                     )
 
         ToggleRequired id state ->
-            ( { model | items = RemoteData.map (\items -> setItemRequiredState id state items) model.items }
+            ( { model | items = RemoteData.map (setItemRequiredState id state) model.items }
             , (setItemStateCmd id state)
             )
 
@@ -267,10 +269,44 @@ update msg model =
             ( { model | currentView = newView }, Cmd.none )
 
         TogglePurchased id state ->
-            ( { model | items = RemoteData.map (\items -> setItemPurchasedState id state items) model.items }
+            ( { model | items = RemoteData.map (setItemPurchasedState id state) model.items }
             , (setItemPurchasedStateCmd id state)
             )
 
+        IncAisle id ->
+            ( { model | items = RemoteData.map (incItemAisle id) model.items }
+            , Cmd.none
+            )
+
+        DecAisle id ->
+            ( { model | items = RemoteData.map (decItemAisle id) model.items }
+            , Cmd.none
+            )
+
+
+incItemAisle id itemList =
+    List.map (incrementAisle id) itemList
+
+incrementAisle id item = 
+    if (item.id == id) then
+        case item.aisle of
+            None -> { item | aisle = Number 1 }
+            Number n -> { item | aisle = Number (n + 1) }
+    else
+        item
+
+decItemAisle id itemList =
+    List.map (decrementAisle id) itemList
+
+decrementAisle id item = 
+    if (item.id == id) then
+        case item.aisle of
+            None -> item
+            Number 0 -> item
+            Number 1 -> { item | aisle = None }
+            Number n -> { item | aisle = Number (n - 1) }
+    else
+        item
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
@@ -437,8 +473,6 @@ boolCompare a b =
         EQ
 
 
-
-
 shoppingListView : List Item -> Html Msg
 shoppingListView items =
     table []
@@ -468,7 +502,7 @@ shoppingItemView item =
         tr []
             [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
             , td [ nameStyle ] [ text item.name ]
-            , td [] [ aisleView item.aisle ]
+            , td [] [ button [ onClick (DecAisle item.id) ] [ text "-"], (aisleView item.aisle), button [ onClick (IncAisle item.id) ] [ text "+" ] ]
             ]
 
 
