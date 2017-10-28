@@ -43,7 +43,7 @@ aisleCompare a b =
         Number an ->
             case b of
                 None ->
-                    LT
+                    GT
 
                 Number bn ->
                     compare an bn
