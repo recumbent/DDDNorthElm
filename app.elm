@@ -437,24 +437,6 @@ boolCompare a b =
         EQ
 
 
-aisleCompare : Aisle -> Aisle -> Order
-aisleCompare a b =
-    case a of
-        None ->
-            case b of
-                None ->
-                    EQ
-
-                _ ->
-                    LT
-
-        Number an ->
-            case b of
-                None ->
-                    LT
-
-                Number bn ->
-                    compare an bn
 
 
 shoppingListView : List Item -> Html Msg
