@@ -5,6 +5,7 @@ module Main exposing (..)
 import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset)
 import Html.Attributes exposing (placeholder, value, type_, checked, style)
 import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
+import Html.Keyed as Keyed
 import Json.Decode as Json
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
@@ -462,7 +463,7 @@ shoppingListView items =
                 , th [] [ text "Aisle" ]
                 ]
             ]
-        , tbody [] (List.map shoppingItemView items)
+        , Keyed.node "tbody" [] (List.map (\i -> ((toString i.id), (shoppingItemView i))) items)
         ]
 
 
