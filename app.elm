@@ -28,7 +28,7 @@ type alias Item =
     , name : String
     , required : Bool
     , purchased : Bool
-    , aisle : Aisle
+    , aisle : Maybe Aisle
     }
 
 
@@ -95,7 +95,7 @@ itemDecoder =
         |> Pipeline.required "name" Json.string
         |> Pipeline.required "required" Json.bool
         |> Pipeline.required "purchased" Json.bool
-        |> Pipeline.optional "aisle" aisleDecoder None
+        |> Pipeline.optional "aisle" (Json.map Just aisleDecoder) Nothing
 
 
 setItemStateRequest : a -> Bool -> Http.Request Item
@@ -185,11 +185,16 @@ itemEncoder item =
             , ( "purchased", Encode.bool item.purchased )
             , ( "aisle"
               , case item.aisle of
-                    None ->
-                        Encode.int 0
+                    Nothing ->
+                        Encode.null
 
-                    Number n ->
-                        Encode.int n
+                    Just a ->
+                        case a of
+                            None ->
+                                Encode.int 0
+
+                            Number n ->
+                                Encode.int n
               )
             ]
     in
@@ -235,7 +240,7 @@ update msg model =
 
                                     newItem : Item
                                     newItem =
-                                        { id = maxId + 1, name = model.inputText, required = True, purchased = False, aisle = None }
+                                        { id = maxId + 1, name = model.inputText, required = True, purchased = False, aisle = Nothing }
                                 in
                                     ( { model | items = Success (newItem :: itemList), inputText = "" }
                                     , newItemCmd newItem
@@ -284,29 +289,57 @@ update msg model =
             )
 
 
+incItemAisle : Int -> List Item -> List Item
 incItemAisle id itemList =
     List.map (incrementAisle id) itemList
 
-incrementAisle id item = 
+
+incrementAisle : Int -> Item -> Item
+incrementAisle id item =
     if (item.id == id) then
         case item.aisle of
-            None -> { item | aisle = Number 1 }
-            Number n -> { item | aisle = Number (n + 1) }
+            Nothing ->
+                { item | aisle = Just None }
+
+            Just aisle ->
+                case aisle of
+                    None ->
+                        { item | aisle = Just (Number 1) }
+
+                    Number n ->
+                        { item | aisle = Just (Number (n + 1)) }
     else
         item
 
+
+decItemAisle : Int -> List Item -> List Item
 decItemAisle id itemList =
     List.map (decrementAisle id) itemList
 
-decrementAisle id item = 
+
+decrementAisle : Int -> Item -> Item
+decrementAisle id item =
     if (item.id == id) then
         case item.aisle of
-            None -> item
-            Number 0 -> item
-            Number 1 -> { item | aisle = None }
-            Number n -> { item | aisle = Number (n - 1) }
+            Nothing ->
+                { item | aisle = Just None }
+
+            Just aisle ->
+                case aisle of
+                    None ->
+                        item
+
+                    Number 0 ->
+                        item
+
+                    Number 1 ->
+                        { item | aisle = Just None }
+
+                    Number n ->
+                        { item | aisle = Just (Number (n - 1)) }
     else
         item
+
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
@@ -445,16 +478,31 @@ shoppingCompare a b =
     in
         case comp of
             EQ ->
-                let
-                    aisleComp =
-                        aisleCompare a.aisle b.aisle
-                in
-                    case aisleComp of
-                        EQ ->
-                            compare (String.toLower a.name) (String.toLower b.name)
+                case a.aisle of
+                    Nothing ->
+                        case b.aisle of
+                            Nothing ->
+                                EQ
 
-                        _ ->
-                            aisleComp
+                            Just ba ->
+                                LT
+
+                    Just aa ->
+                        case b.aisle of
+                            Nothing ->
+                                GT
+
+                            Just ba ->
+                                let
+                                    aisleComp =
+                                        aisleCompare aa ba
+                                in
+                                    case aisleComp of
+                                        EQ ->
+                                            compare (String.toLower a.name) (String.toLower b.name)
+
+                                        _ ->
+                                            aisleComp
 
             _ ->
                 comp
@@ -502,20 +550,25 @@ shoppingItemView item =
         tr []
             [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
             , td [ nameStyle ] [ text item.name ]
-            , td [] [ button [ onClick (DecAisle item.id) ] [ text "-"], (aisleView item.aisle), button [ onClick (IncAisle item.id) ] [ text "+" ] ]
+            , td [] [ button [ onClick (DecAisle item.id) ] [ text "-" ], (aisleView item.aisle), button [ onClick (IncAisle item.id) ] [ text "+" ] ]
             ]
 
 
-aisleView : Aisle -> Html msg
+aisleView : Maybe Aisle -> Html msg
 aisleView aisle =
     let
         aisleText =
             case aisle of
-                None ->
-                    " - "
+                Nothing ->
+                    " ? "
 
-                Number n ->
-                    toString n
+                Just a ->
+                    case a of
+                        None ->
+                            " - "
+
+                        Number n ->
+                            toString n
     in
         text aisleText
 
