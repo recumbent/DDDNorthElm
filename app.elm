@@ -68,7 +68,11 @@ init =
 
 serverUrl : String
 serverUrl =
-    "http://127.0.0.1:4000/items"
+    -- "http://127.0.0.1:55944/items"
+    -- "http://127.0.0.1:4000/items"
+    -- "http://localhost:55943/items"
+    "http://localhost:52417/items"
+
 
 
 itemUrl : a -> String
@@ -91,11 +95,11 @@ decodeItems =
 itemDecoder : Json.Decoder Item
 itemDecoder =
     Pipeline.decode Item
-        |> Pipeline.required "id" Json.int
-        |> Pipeline.required "name" Json.string
-        |> Pipeline.required "required" Json.bool
-        |> Pipeline.required "purchased" Json.bool
-        |> Pipeline.optional "aisle" aisleDecoder None
+        |> Pipeline.required "Id" Json.int
+        |> Pipeline.required "Name" Json.string
+        |> Pipeline.required "Required" Json.bool
+        |> Pipeline.required "Purchased" Json.bool
+        |> Pipeline.optional "Aisle" aisleDecoder None
 
 
 setItemStateRequest : a -> Bool -> Http.Request Item
@@ -115,8 +119,8 @@ itemStateEncoder : Bool -> Encode.Value
 itemStateEncoder required =
     let
         attributes =
-            [ ( "required", Encode.bool required )
-            , ( "purchased", Encode.bool False )
+            [ ( "Required", Encode.bool required )
+            , ( "Purchased", Encode.bool False )
             ]
     in
         Encode.object attributes
@@ -126,7 +130,7 @@ itemPurchasedStateEncoder : Bool -> Encode.Value
 itemPurchasedStateEncoder purchased =
     let
         attributes =
-            [ ( "purchased", Encode.bool purchased )
+            [ ( "Purchased", Encode.bool purchased )
             ]
     in
         Encode.object attributes
@@ -179,11 +183,11 @@ itemEncoder : Item -> Encode.Value
 itemEncoder item =
     let
         attributes =
-            [ ( "id", Encode.int item.id )
-            , ( "name", Encode.string item.name )
-            , ( "required", Encode.bool item.required )
-            , ( "purchased", Encode.bool item.purchased )
-            , ( "aisle"
+            [ ( "Id", Encode.int item.id )
+            , ( "Name", Encode.string item.name )
+            , ( "Required", Encode.bool item.required )
+            , ( "Purchased", Encode.bool item.purchased )
+            , ( "Aisle"
               , case item.aisle of
                     None ->
                         Encode.int 0
@@ -284,29 +288,47 @@ update msg model =
             )
 
 
+incItemAisle : a -> List { b | aisle : Aisle, id : a } -> List { b | aisle : Aisle, id : a }
 incItemAisle id itemList =
     List.map (incrementAisle id) itemList
 
-incrementAisle id item = 
+
+incrementAisle : a -> { b | aisle : Aisle, id : a } -> { b | aisle : Aisle, id : a }
+incrementAisle id item =
     if (item.id == id) then
         case item.aisle of
-            None -> { item | aisle = Number 1 }
-            Number n -> { item | aisle = Number (n + 1) }
+            None ->
+                { item | aisle = Number 1 }
+
+            Number n ->
+                { item | aisle = Number (n + 1) }
     else
         item
 
+
+decItemAisle : a -> List { b | aisle : Aisle, id : a } -> List { b | aisle : Aisle, id : a }
 decItemAisle id itemList =
     List.map (decrementAisle id) itemList
 
-decrementAisle id item = 
+
+decrementAisle : a -> { b | aisle : Aisle, id : a } -> { b | aisle : Aisle, id : a }
+decrementAisle id item =
     if (item.id == id) then
         case item.aisle of
-            None -> item
-            Number 0 -> item
-            Number 1 -> { item | aisle = None }
-            Number n -> { item | aisle = Number (n - 1) }
+            None ->
+                item
+
+            Number 0 ->
+                item
+
+            Number 1 ->
+                { item | aisle = None }
+
+            Number n ->
+                { item | aisle = Number (n - 1) }
     else
         item
+
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
 setItemRequiredState id state itemList =
@@ -502,7 +524,7 @@ shoppingItemView item =
         tr []
             [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
             , td [ nameStyle ] [ text item.name ]
-            , td [] [ button [ onClick (DecAisle item.id) ] [ text "-"], (aisleView item.aisle), button [ onClick (IncAisle item.id) ] [ text "+" ] ]
+            , td [] [ button [ onClick (DecAisle item.id) ] [ text "-" ], (aisleView item.aisle), button [ onClick (IncAisle item.id) ] [ text "+" ] ]
             ]
 
 
