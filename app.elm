@@ -28,7 +28,7 @@ type alias Item =
     , name : String
     , required : Bool
     , purchased : Bool
-    , aisle : Aisle
+    , aisle : Maybe Aisle
     }
 
 
@@ -95,11 +95,11 @@ decodeItems =
 itemDecoder : Json.Decoder Item
 itemDecoder =
     Pipeline.decode Item
-        |> Pipeline.required "Id" Json.int
-        |> Pipeline.required "Name" Json.string
-        |> Pipeline.required "Required" Json.bool
-        |> Pipeline.required "Purchased" Json.bool
-        |> Pipeline.optional "Aisle" aisleDecoder None
+        |> Pipeline.required "id" Json.int
+        |> Pipeline.required "name" Json.string
+        |> Pipeline.required "required" Json.bool
+        |> Pipeline.required "purchased" Json.bool
+        |> Pipeline.optional "aisle" (Json.map Just aisleDecoder) Nothing
 
 
 setItemStateRequest : a -> Bool -> Http.Request Item
@@ -189,11 +189,16 @@ itemEncoder item =
             , ( "Purchased", Encode.bool item.purchased )
             , ( "Aisle"
               , case item.aisle of
-                    None ->
-                        Encode.int 0
+                    Nothing ->
+                        Encode.null
 
-                    Number n ->
-                        Encode.int n
+                    Just a ->
+                        case a of
+                            None ->
+                                Encode.int 0
+
+                            Number n ->
+                                Encode.int n
               )
             ]
     in
@@ -239,7 +244,7 @@ update msg model =
 
                                     newItem : Item
                                     newItem =
-                                        { id = maxId + 1, name = model.inputText, required = True, purchased = False, aisle = None }
+                                        { id = maxId + 1, name = model.inputText, required = True, purchased = False, aisle = Nothing }
                                 in
                                     ( { model | items = Success (newItem :: itemList), inputText = "" }
                                     , newItemCmd newItem
@@ -288,44 +293,54 @@ update msg model =
             )
 
 
-incItemAisle : a -> List { b | aisle : Aisle, id : a } -> List { b | aisle : Aisle, id : a }
+incItemAisle : Int -> List Item -> List Item
 incItemAisle id itemList =
     List.map (incrementAisle id) itemList
 
 
-incrementAisle : a -> { b | aisle : Aisle, id : a } -> { b | aisle : Aisle, id : a }
+incrementAisle : Int -> Item -> Item
 incrementAisle id item =
     if (item.id == id) then
         case item.aisle of
-            None ->
-                { item | aisle = Number 1 }
+            Nothing ->
+                { item | aisle = Just None }
 
-            Number n ->
-                { item | aisle = Number (n + 1) }
+            Just aisle ->
+                case aisle of
+                    None ->
+                        { item | aisle = Just (Number 1) }
+
+                    Number n ->
+                        { item | aisle = Just (Number (n + 1)) }
     else
         item
 
 
-decItemAisle : a -> List { b | aisle : Aisle, id : a } -> List { b | aisle : Aisle, id : a }
+decItemAisle : Int -> List Item -> List Item
 decItemAisle id itemList =
     List.map (decrementAisle id) itemList
 
 
-decrementAisle : a -> { b | aisle : Aisle, id : a } -> { b | aisle : Aisle, id : a }
+decrementAisle : Int -> Item -> Item
 decrementAisle id item =
     if (item.id == id) then
         case item.aisle of
-            None ->
-                item
+            Nothing ->
+                { item | aisle = Just None }
 
-            Number 0 ->
-                item
+            Just aisle ->
+                case aisle of
+                    None ->
+                        item
 
-            Number 1 ->
-                { item | aisle = None }
+                    Number 0 ->
+                        item
 
-            Number n ->
-                { item | aisle = Number (n - 1) }
+                    Number 1 ->
+                        { item | aisle = Just None }
+
+                    Number n ->
+                        { item | aisle = Just (Number (n - 1)) }
     else
         item
 
@@ -467,16 +482,31 @@ shoppingCompare a b =
     in
         case comp of
             EQ ->
-                let
-                    aisleComp =
-                        aisleCompare a.aisle b.aisle
-                in
-                    case aisleComp of
-                        EQ ->
-                            compare (String.toLower a.name) (String.toLower b.name)
+                case a.aisle of
+                    Nothing ->
+                        case b.aisle of
+                            Nothing ->
+                                EQ
 
-                        _ ->
-                            aisleComp
+                            Just ba ->
+                                LT
+
+                    Just aa ->
+                        case b.aisle of
+                            Nothing ->
+                                GT
+
+                            Just ba ->
+                                let
+                                    aisleComp =
+                                        aisleCompare aa ba
+                                in
+                                    case aisleComp of
+                                        EQ ->
+                                            compare (String.toLower a.name) (String.toLower b.name)
+
+                                        _ ->
+                                            aisleComp
 
             _ ->
                 comp
@@ -528,16 +558,21 @@ shoppingItemView item =
             ]
 
 
-aisleView : Aisle -> Html msg
+aisleView : Maybe Aisle -> Html msg
 aisleView aisle =
     let
         aisleText =
             case aisle of
-                None ->
-                    " - "
+                Nothing ->
+                    " ? "
 
-                Number n ->
-                    toString n
+                Just a ->
+                    case a of
+                        None ->
+                            " - "
+
+                        Number n ->
+                            toString n
     in
         text aisleText
 
