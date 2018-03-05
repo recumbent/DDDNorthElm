@@ -2,7 +2,7 @@ module Main exposing (..)
 
 -- Import the things we might need
 
-import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset, button)
+import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset, button, hr)
 import Html.Attributes exposing (placeholder, value, type_, checked, style)
 import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
 import Html.Keyed as Keyed
@@ -11,7 +11,7 @@ import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
 import RemoteData exposing (..)
 import Http exposing (Error)
-import Json.Decode exposing (Decoder, decodeValue, succeed, string)
+import Json.Decode exposing (Decoder, decodeValue, succeed, string, list)
 import Aisle exposing (..)
 
 
@@ -21,6 +21,7 @@ import Aisle exposing (..)
 type Views
     = ItemList
     | ShoppingList
+    | Checkout
 
 
 type alias Item =
@@ -79,6 +80,10 @@ itemUrl : a -> String
 itemUrl id =
     String.join "/" [ serverUrl, (toString id) ]
 
+
+checkoutUrl : String
+checkoutUrl =
+    String.join "/" [ serverUrl, "checkout" ]
 
 getItemList : Cmd Msg
 getItemList =
@@ -205,6 +210,16 @@ itemEncoder item =
         Encode.object attributes
 
 
+checkoutCmd : Cmd Msg
+checkoutCmd = 
+    checkoutRequest
+        |> RemoteData.sendRequest
+        |> Cmd.map OnCheckout
+
+
+checkoutRequest : Http.Request (List Item)
+checkoutRequest = 
+    Http.post checkoutUrl Http.emptyBody decodeItems
 
 -- UPDATE
 
@@ -220,6 +235,8 @@ type Msg
     | TogglePurchased Int Bool
     | IncAisle Int
     | DecAisle Int
+    | DoCheckout
+    | OnCheckout (RemoteData Error ItemList)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -289,6 +306,16 @@ update msg model =
 
         DecAisle id ->
             ( { model | items = RemoteData.map (decItemAisle id) model.items }
+            , Cmd.none
+            )
+
+        DoCheckout ->
+            ( model
+            , checkoutCmd
+            )
+
+        OnCheckout responseData ->
+            ( { model | items = responseData, currentView = ItemList }
             , Cmd.none
             )
 
@@ -392,7 +419,7 @@ onEnter msg =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Simple elm application" ]
+        [ h1 [] [ text "Shopping list" ]
         , viewSelector model.currentView
         , case model.items of
             NotAsked ->
@@ -421,6 +448,9 @@ successView model =
 
             ShoppingList ->
                 shoppingView items
+
+            Checkout ->
+                checkoutView items
 
 
 itemsView : String -> List Item -> Html Msg
@@ -576,12 +606,25 @@ aisleView aisle =
     in
         text aisleText
 
+checkoutView : List Item -> Html Msg
+checkoutView items =
+    let
+        required  = items |> List.filter (\i -> i.required) |> List.length
+        purchased = items |> List.filter (\i -> i.required && i.purchased) |> List.length 
+    in
+        div []
+            [ h2 [] [text ("Purchased: " ++ (toString purchased) ++ " of " ++ (toString required))]
+            , hr [] []
+            , button [ onClick DoCheckout ] [ text "Do Checkout" ] 
+            ]
+
 
 viewSelector : Views -> Html Msg
 viewSelector currentView =
     fieldset []
         [ radio (SelectView ItemList) "Pick Items" (currentView == ItemList)
         , radio (SelectView ShoppingList) "Shop!" (currentView == ShoppingList)
+        , radio (SelectView Checkout) "Checkout" (currentView == Checkout)
         ]
 
 
