@@ -95,11 +95,11 @@ decodeItems =
 itemDecoder : Json.Decoder Item
 itemDecoder =
     Pipeline.decode Item
-        |> Pipeline.required "id" Json.int
-        |> Pipeline.required "name" Json.string
-        |> Pipeline.required "required" Json.bool
-        |> Pipeline.required "purchased" Json.bool
-        |> Pipeline.optional "aisle" (Json.map Just aisleDecoder) Nothing
+        |> Pipeline.required "Id" Json.int
+        |> Pipeline.required "Name" Json.string
+        |> Pipeline.required "Required" Json.bool
+        |> Pipeline.required "Purchased" Json.bool
+        |> Pipeline.optional "Aisle" (Json.map Just aisleDecoder) Nothing
 
 
 setItemStateRequest : a -> Bool -> Http.Request Item
