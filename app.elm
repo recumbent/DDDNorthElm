@@ -75,7 +75,6 @@ serverUrl =
     "http://localhost:52417/items"
 
 
-
 itemUrl : a -> String
 itemUrl id =
     String.join "/" [ serverUrl, (toString id) ]
@@ -84,6 +83,7 @@ itemUrl id =
 checkoutUrl : String
 checkoutUrl =
     String.join "/" [ serverUrl, "checkout" ]
+
 
 getItemList : Cmd Msg
 getItemList =
@@ -141,6 +141,16 @@ itemPurchasedStateEncoder purchased =
         Encode.object attributes
 
 
+itemAisleEncoder : Maybe Aisle -> Encode.Value
+itemAisleEncoder aisle =
+    let
+        attributes =
+            [ ( "Aisle", encodeAisle aisle )
+            ]
+    in
+        Encode.object attributes
+
+
 setItemStateCmd : a -> Bool -> Cmd Msg
 setItemStateCmd id state =
     setItemStateRequest id state
@@ -168,6 +178,26 @@ setItemPurchasedStateCmd id state =
         |> Cmd.map OnSetItemState
 
 
+setItemAisleRequest : a -> Maybe Aisle -> Http.Request Item
+setItemAisleRequest id aisle =
+    Http.request
+        { body = itemAisleEncoder aisle |> Http.jsonBody
+        , expect = Http.expectJson itemDecoder
+        , headers = []
+        , method = "PATCH"
+        , timeout = Nothing
+        , url = itemUrl id
+        , withCredentials = False
+        }
+
+
+setItemAisleCmd : a -> Maybe Aisle -> Cmd Msg
+setItemAisleCmd id aisle =
+    setItemAisleRequest id aisle
+        |> RemoteData.sendRequest
+        |> Cmd.map OnSetAisle
+
+
 newItemCmd : Item -> Cmd Msg
 newItemCmd item =
     newItemRequest item
@@ -184,6 +214,21 @@ newItemRequest item =
         Http.post serverUrl itemBody itemDecoder
 
 
+encodeAisle : Maybe Aisle -> Encode.Value
+encodeAisle aisle =
+    case aisle of
+        Nothing ->
+            Encode.null
+
+        Just a ->
+            case a of
+                None ->
+                    Encode.int 0
+
+                Number n ->
+                    Encode.int n
+
+
 itemEncoder : Item -> Encode.Value
 itemEncoder item =
     let
@@ -192,34 +237,24 @@ itemEncoder item =
             , ( "Name", Encode.string item.name )
             , ( "Required", Encode.bool item.required )
             , ( "Purchased", Encode.bool item.purchased )
-            , ( "Aisle"
-              , case item.aisle of
-                    Nothing ->
-                        Encode.null
-
-                    Just a ->
-                        case a of
-                            None ->
-                                Encode.int 0
-
-                            Number n ->
-                                Encode.int n
-              )
+            , ( "Aisle", encodeAisle item.aisle )
             ]
     in
         Encode.object attributes
 
 
 checkoutCmd : Cmd Msg
-checkoutCmd = 
+checkoutCmd =
     checkoutRequest
         |> RemoteData.sendRequest
         |> Cmd.map OnCheckout
 
 
 checkoutRequest : Http.Request (List Item)
-checkoutRequest = 
+checkoutRequest =
     Http.post checkoutUrl Http.emptyBody decodeItems
+
+
 
 -- UPDATE
 
@@ -237,6 +272,7 @@ type Msg
     | DecAisle Int
     | DoCheckout
     | OnCheckout (RemoteData Error ItemList)
+    | OnSetAisle (RemoteData Error Item)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -300,14 +336,36 @@ update msg model =
             )
 
         IncAisle id ->
-            ( { model | items = RemoteData.map (incItemAisle id) model.items }
-            , Cmd.none
-            )
+            let
+                hacked =
+                    RemoteData.toMaybe model.items
+                        |> Maybe.map (List.partition (\i -> i.id == id))
+                        |> Maybe.andThen (processTuple incrementItemAisle)
+            in
+                case hacked of
+                    Nothing ->
+                        ( model, Cmd.none )
+
+                    Just ( modified, list ) ->
+                        ( { model | items = RemoteData.Success (modified :: list) }
+                        , (setItemAisleCmd id modified.aisle)
+                        )
 
         DecAisle id ->
-            ( { model | items = RemoteData.map (decItemAisle id) model.items }
-            , Cmd.none
-            )
+            let
+                hacked =
+                    RemoteData.toMaybe model.items
+                        |> Maybe.map (List.partition (\i -> i.id == id))
+                        |> Maybe.andThen (processTuple decrementItemAisle)
+            in
+                case hacked of
+                    Nothing ->
+                        ( model, Cmd.none )
+
+                    Just ( modified, list ) ->
+                        ( { model | items = RemoteData.Success (modified :: list) }
+                        , (setItemAisleCmd id modified.aisle)
+                        )
 
         DoCheckout ->
             ( model
@@ -319,57 +377,78 @@ update msg model =
             , Cmd.none
             )
 
+        OnSetAisle responseData ->
+            ( model, Cmd.none )
+
+
+processTuple : (a -> b) -> ( List a, c ) -> Maybe ( b, c )
+processTuple modifier tp =
+    Tuple.first tp
+        |> List.head
+        |> Maybe.map modifier
+        |> Maybe.map (\m -> ( m, (Tuple.second tp) ))
+
 
 incItemAisle : Int -> List Item -> List Item
 incItemAisle id itemList =
-    List.map (incrementAisle id) itemList
+    List.map (incrementAisleIfMatch id) itemList
 
 
-incrementAisle : Int -> Item -> Item
-incrementAisle id item =
+incrementAisleIfMatch : Int -> Item -> Item
+incrementAisleIfMatch id item =
     if (item.id == id) then
-        case item.aisle of
-            Nothing ->
-                { item | aisle = Just None }
-
-            Just aisle ->
-                case aisle of
-                    None ->
-                        { item | aisle = Just (Number 1) }
-
-                    Number n ->
-                        { item | aisle = Just (Number (n + 1)) }
+        incrementItemAisle item
     else
         item
+
+
+incrementItemAisle : { a | aisle : Maybe Aisle } -> { a | aisle : Maybe Aisle }
+incrementItemAisle item =
+    case item.aisle of
+        Nothing ->
+            { item | aisle = Just None }
+
+        Just aisle ->
+            case aisle of
+                None ->
+                    { item | aisle = Just (Number 1) }
+
+                Number n ->
+                    { item | aisle = Just (Number (n + 1)) }
 
 
 decItemAisle : Int -> List Item -> List Item
 decItemAisle id itemList =
-    List.map (decrementAisle id) itemList
+    List.map (decrementAisleIfMatch id) itemList
 
 
-decrementAisle : Int -> Item -> Item
-decrementAisle id item =
+decrementAisleIfMatch : Int -> Item -> Item
+decrementAisleIfMatch id item =
     if (item.id == id) then
-        case item.aisle of
-            Nothing ->
-                { item | aisle = Just None }
-
-            Just aisle ->
-                case aisle of
-                    None ->
-                        item
-
-                    Number 0 ->
-                        item
-
-                    Number 1 ->
-                        { item | aisle = Just None }
-
-                    Number n ->
-                        { item | aisle = Just (Number (n - 1)) }
+        decrementItemAisle item
     else
         item
+
+
+decrementItemAisle : { a | aisle : Maybe Aisle } -> { a | aisle : Maybe Aisle }
+decrementItemAisle item =
+    case item.aisle of
+        Nothing ->
+            { item | aisle = Just None }
+
+        Just aisle ->
+            case aisle of
+                None ->
+                    item
+
+                Number 0 ->
+                    item
+
+                Number 1 ->
+                    { item | aisle = Just None }
+
+                Number n ->
+                    { item | aisle = Just (Number (n - 1)) }
 
 
 setItemRequiredState : a -> b -> List { c | id : a, required : b } -> List { c | id : a, required : b }
@@ -606,16 +685,20 @@ aisleView aisle =
     in
         text aisleText
 
+
 checkoutView : List Item -> Html Msg
 checkoutView items =
     let
-        required  = items |> List.filter (\i -> i.required) |> List.length
-        purchased = items |> List.filter (\i -> i.required && i.purchased) |> List.length 
+        required =
+            items |> List.filter (\i -> i.required) |> List.length
+
+        purchased =
+            items |> List.filter (\i -> i.required && i.purchased) |> List.length
     in
         div []
-            [ h2 [] [text ("Purchased: " ++ (toString purchased) ++ " of " ++ (toString required))]
+            [ h2 [] [ text ("Purchased: " ++ (toString purchased) ++ " of " ++ (toString required)) ]
             , hr [] []
-            , button [ onClick DoCheckout ] [ text "Do Checkout" ] 
+            , button [ onClick DoCheckout ] [ text "Do Checkout" ]
             ]
 
 

@@ -7,3 +7,11 @@ GET http://localhost:52417/items
 ###
 
 GET http://127.0.0.1:4000/items
+
+###
+
+POST http://localhost:52417/items/checkout
+
+###
+
+GET http://localhost:52417/items/checkout
