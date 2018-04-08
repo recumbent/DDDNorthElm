@@ -15,3 +15,11 @@ POST http://localhost:52417/items/checkout
 ###
 
 GET http://localhost:52417/items/checkout
+
+###
+
+PATCH http://localhost:52417/items/12
+
+{
+    "Aisle":2
+}

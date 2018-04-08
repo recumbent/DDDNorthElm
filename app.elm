@@ -43,6 +43,7 @@ type alias Model =
     { currentView : Views
     , inputText : String
     , items : RemoteData Error ItemList
+    , lastAisle: Maybe Aisle
     }
 
 
@@ -51,6 +52,7 @@ model =
     { currentView = ItemList
     , inputText = ""
     , items = Loading
+    , lastAisle = Nothing
     }
 
 
@@ -327,22 +329,33 @@ update msg model =
             ( model, Cmd.none )
 
         OnNewItem responseData ->
+            Debug.log (getLogMessages responseData)
             ( model, Cmd.none )
 
         SelectView newView ->
             ( { model | currentView = newView }, Cmd.none )
 
         TogglePurchased id state ->
-            ( { model | items = RemoteData.map (setItemPurchasedState id state) model.items }
-            , (setItemPurchasedStateCmd id state)
-            )
+            let
+                hacked =
+                    RemoteData.toMaybe model.items
+                        |> Maybe.map (List.partition (\i -> i.id == id))
+                        |> Maybe.andThen (processTuple (\i -> { i | purchased = state}))
+            in
+                case hacked of 
+                    Nothing ->
+                        ( model, Cmd.none )
+                    Just ( modified, list ) ->
+                        ( { model | items = RemoteData.Success (modified :: list), lastAisle = modified.aisle } 
+                        , (setItemPurchasedStateCmd id state)
+                        )
 
         IncAisle id ->
             let
                 hacked =
                     RemoteData.toMaybe model.items
                         |> Maybe.map (List.partition (\i -> i.id == id))
-                        |> Maybe.andThen (processTuple incrementItemAisle)
+                        |> Maybe.andThen (processTuple (incrementItemAisle model.lastAisle))
             in
                 case hacked of
                     Nothing ->
@@ -358,7 +371,7 @@ update msg model =
                 hacked =
                     RemoteData.toMaybe model.items
                         |> Maybe.map (List.partition (\i -> i.id == id))
-                        |> Maybe.andThen (processTuple decrementItemAisle)
+                        |> Maybe.andThen (processTuple (decrementItemAisle model.lastAisle))
             in
                 case hacked of
                     Nothing ->
@@ -380,8 +393,18 @@ update msg model =
             )
 
         OnSetAisle responseData ->
+            Debug.log (getLogMessages responseData)
             ( model, Cmd.none )
 
+getLogMessages : RemoteData Error a -> String
+getLogMessages responseData =
+    case responseData of
+        Failure e ->
+            case e of
+                Http.BadPayload s r ->
+                    s
+                _ -> "Not a bad payload?"
+        _ -> "Not a failure?" 
 
 processTuple : (a -> b) -> ( List a, c ) -> Maybe ( b, c )
 processTuple modifier tp =
@@ -390,25 +413,13 @@ processTuple modifier tp =
         |> Maybe.map modifier
         |> Maybe.map (\m -> ( m, (Tuple.second tp) ))
 
-
-incItemAisle : Int -> List Item -> List Item
-incItemAisle id itemList =
-    List.map (incrementAisleIfMatch id) itemList
-
-
-incrementAisleIfMatch : Int -> Item -> Item
-incrementAisleIfMatch id item =
-    if (item.id == id) then
-        incrementItemAisle item
-    else
-        item
-
-
-incrementItemAisle : { a | aisle : Maybe Aisle } -> { a | aisle : Maybe Aisle }
-incrementItemAisle item =
+incrementItemAisle : Maybe Aisle -> { a | aisle : Maybe Aisle } -> { a | aisle : Maybe Aisle }
+incrementItemAisle lastAisle item =
     case item.aisle of
         Nothing ->
-            { item | aisle = Just None }
+            case lastAisle of
+                Nothing -> { item | aisle = Just None }
+                Just aisle -> { item | aisle = Just aisle }
 
         Just aisle ->
             case aisle of
@@ -419,24 +430,13 @@ incrementItemAisle item =
                     { item | aisle = Just (Number (n + 1)) }
 
 
-decItemAisle : Int -> List Item -> List Item
-decItemAisle id itemList =
-    List.map (decrementAisleIfMatch id) itemList
-
-
-decrementAisleIfMatch : Int -> Item -> Item
-decrementAisleIfMatch id item =
-    if (item.id == id) then
-        decrementItemAisle item
-    else
-        item
-
-
-decrementItemAisle : { a | aisle : Maybe Aisle } -> { a | aisle : Maybe Aisle }
-decrementItemAisle item =
+decrementItemAisle : Maybe Aisle -> { a | aisle : Maybe Aisle } -> { a | aisle : Maybe Aisle }
+decrementItemAisle lastAisle item =
     case item.aisle of
         Nothing ->
-            { item | aisle = Just None }
+            case lastAisle of
+                Nothing -> { item | aisle = Just None }
+                Just aisle -> { item | aisle = Just aisle }
 
         Just aisle ->
             case aisle of
