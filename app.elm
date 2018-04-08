@@ -329,7 +329,6 @@ update msg model =
             ( model, Cmd.none )
 
         OnNewItem responseData ->
-            Debug.log (getLogMessages responseData)
             ( model, Cmd.none )
 
         SelectView newView ->
@@ -393,7 +392,6 @@ update msg model =
             )
 
         OnSetAisle responseData ->
-            Debug.log (getLogMessages responseData)
             ( model, Cmd.none )
 
 getLogMessages : RemoteData Error a -> String
