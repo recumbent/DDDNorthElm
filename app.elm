@@ -599,7 +599,7 @@ shoppingCompare a b =
                     Nothing ->
                         case b.aisle of
                             Nothing ->
-                                EQ
+                                compare (String.toLower a.name) (String.toLower b.name)
 
                             Just ba ->
                                 LT
