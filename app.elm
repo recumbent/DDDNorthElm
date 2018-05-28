@@ -304,7 +304,7 @@ update msg model =
                                     )
 
                             Just item ->
-                                ( { model | items = RemoteData.map (\items -> setItemRequiredState item.id True items) model.items }
+                                ( { model | items = RemoteData.map (\items -> setItemRequiredState item.id True items) model.items, inputText = "" }
                                 , (setItemStateCmd item.id True)
                                 )
 
