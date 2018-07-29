@@ -2,7 +2,7 @@ module Main exposing (..)
 
 -- Import the things we might need
 
-import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset, button, hr)
+import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset, button, hr, a)
 import Html.Attributes exposing (placeholder, value, type_, checked, style)
 import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
 import Html.Keyed as Keyed
@@ -13,6 +13,8 @@ import RemoteData exposing (..)
 import Http exposing (Error)
 import Json.Decode exposing (Decoder, decodeValue, succeed, string, list)
 import Aisle exposing (..)
+import FontAwesome exposing (useSvg, iconWithOptions, edit)
+
 
 
 -- MODEL
@@ -498,7 +500,8 @@ onEnter msg =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Shopping list" ]
+        [ useSvg
+        , h1 [] [ text "Shopping list" ]
         , viewSelector model.currentView
         , case model.items of
             NotAsked ->
@@ -571,7 +574,10 @@ itemView : Item -> Html Msg
 itemView item =
     tr []
         [ td [] [ text (toString item.id) ]
-        , td [] [ text item.name ]
+        , td [] 
+            [ text item.name
+            , a [] [ iconWithOptions edit FontAwesome.Regular [ FontAwesome.HasFixedWidth ] [] ]
+            ] 
         , td [] [ input [ type_ "checkbox", (checked item.required), onCheck (ToggleRequired item.id) ] [] ]
         ]
 
