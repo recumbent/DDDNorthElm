@@ -2,13 +2,12 @@ module Aisle exposing (..)
 
 import Json.Decode as Json
 
-
 type Aisle
     = None
     | Number Int
 
 
-intToAisle : number -> Aisle
+intToAisle : Int -> Aisle
 intToAisle i =
     case i of
         0 ->
@@ -18,7 +17,7 @@ intToAisle i =
             Number i
 
 
-intToAisleDec : number -> Json.Decoder Aisle
+intToAisleDec : Int -> Json.Decoder Aisle
 intToAisleDec i =
     Json.succeed (intToAisle i)
 
