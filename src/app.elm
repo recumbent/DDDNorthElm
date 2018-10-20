@@ -291,7 +291,7 @@ update msg model =
                 Success itemList ->
                     let
                         match =
-                            List.filter (\i -> String.contains model.inputText i.name) itemList
+                            filterByItemName model.inputText itemList
                                 |> List.head
                     in
                         case match of
@@ -546,10 +546,12 @@ itemsView inputText items =
         , filteredSortedItemListView inputText items
         ]
 
+filterByItemName filterText items =
+    List.filter (\i -> String.contains (String.toLower filterText) (String.toLower i.name)) items
 
 filteredSortedItemListView : String -> List Item -> Html Msg
 filteredSortedItemListView filterText items =
-    List.filter (\i -> String.contains filterText i.name) items
+    filterByItemName filterText items
         |> List.sortBy .name
         |> itemListView
 
