@@ -3,6 +3,7 @@ module Main exposing (..)
 -- Import the things we might need
 
 import Html exposing (Html, Attribute, h1, h2, div, text, input, ul, li, table, thead, th, tbody, tr, td, p, label, fieldset, button, hr, a)
+import Browser
 import Html.Attributes exposing (placeholder, value, type_, checked, style)
 import Html.Events exposing (onInput, on, keyCode, onCheck, onClick)
 import Html.Keyed as Keyed
@@ -47,8 +48,8 @@ type alias Model =
     }
 
 
-model : Model
-model =
+appModel : Model
+appModel =
     { currentView = ItemList
     , inputText = ""
     , items = Loading
@@ -60,9 +61,9 @@ model =
 -- INIT
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( model
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( appModel
     , getItemList
     )
 
@@ -79,9 +80,9 @@ serverUrl =
     "http://localhost:52417/items"
 
 
-itemUrl : a -> String
+itemUrl : Int -> String
 itemUrl id =
-    String.join "/" [ serverUrl, (toString id) ]
+    String.join "/" [ serverUrl, (String.fromInt id) ]
 
 
 checkoutUrl : String
@@ -103,7 +104,7 @@ decodeItems =
 
 itemDecoder : Json.Decoder Item
 itemDecoder =
-    Pipeline.decode Item
+    Json.succeed Item
         |> Pipeline.required "Id" Json.int
         |> Pipeline.required "Name" Json.string
         |> Pipeline.required "Required" Json.bool
@@ -111,7 +112,7 @@ itemDecoder =
         |> Pipeline.optional "Aisle" (Json.map Just aisleDecoder) Nothing
 
 
-setItemStateRequest : a -> Bool -> Http.Request Item
+setItemStateRequest : Int -> Bool -> Http.Request Item
 setItemStateRequest id state =
     Http.request
         { body = itemStateEncoder state |> Http.jsonBody
@@ -155,14 +156,14 @@ itemAisleEncoder aisle =
         Encode.object attributes
 
 
-setItemStateCmd : a -> Bool -> Cmd Msg
+setItemStateCmd : Int -> Bool -> Cmd Msg
 setItemStateCmd id state =
     setItemStateRequest id state
         |> RemoteData.sendRequest
         |> Cmd.map OnSetItemState
 
 
-setItemPurchasedStateRequest : a -> Bool -> Http.Request Item
+setItemPurchasedStateRequest : Int -> Bool -> Http.Request Item
 setItemPurchasedStateRequest id state =
     Http.request
         { body = itemPurchasedStateEncoder state |> Http.jsonBody
@@ -175,14 +176,14 @@ setItemPurchasedStateRequest id state =
         }
 
 
-setItemPurchasedStateCmd : a -> Bool -> Cmd Msg
+setItemPurchasedStateCmd : Int -> Bool -> Cmd Msg
 setItemPurchasedStateCmd id state =
     setItemPurchasedStateRequest id state
         |> RemoteData.sendRequest
         |> Cmd.map OnSetItemState
 
 
-setItemAisleRequest : a -> Maybe Aisle -> Http.Request Item
+setItemAisleRequest : Int -> Maybe Aisle -> Http.Request Item
 setItemAisleRequest id aisle =
     Http.request
         { body = itemAisleEncoder aisle |> Http.jsonBody
@@ -195,7 +196,7 @@ setItemAisleRequest id aisle =
         }
 
 
-setItemAisleCmd : a -> Maybe Aisle -> Cmd Msg
+setItemAisleCmd : Int -> Maybe Aisle -> Cmd Msg
 setItemAisleCmd id aisle =
     setItemAisleRequest id aisle
         |> RemoteData.sendRequest
@@ -509,7 +510,7 @@ view model =
                 h2 [] [ text "Loading items..." ]
 
             Failure err ->
-                h2 [] [ text ("HTTP Failure: " ++ (toString err)) ]
+                h2 [] [ text ("HTTP Failure: " ++ (errorToString err)) ]
 
             Success items ->
                 successView model
@@ -571,7 +572,7 @@ itemListView itemList =
 itemView : Item -> Html Msg
 itemView item =
     tr []
-        [ td [] [ text (toString item.id) ]
+        [ td [] [ text (String.fromInt item.id) ]
         , td [] 
             [ text item.name
             , a [] [ iconWithOptions edit FontAwesome.Regular [ FontAwesome.HasFixedWidth ] [] ]
@@ -648,7 +649,7 @@ shoppingListView items =
                 , th [] [ text "Aisle" ]
                 ]
             ]
-        , Keyed.node "tbody" [] (List.map (\i -> ( (toString i.id), (shoppingItemView i) )) items)
+        , Keyed.node "tbody" [] (List.map (\i -> ( (String.fromInt i.id), (shoppingItemView i) )) items)
         ]
 
 
@@ -662,7 +663,7 @@ shoppingItemView item =
                 "none"
 
         nameStyle =
-            style [ ( "text-decoration", textDecor ) ]
+            style "text-decoration" textDecor
     in
         tr []
             [ td [] [ input [ type_ "checkbox", (checked item.purchased), onCheck (TogglePurchased item.id) ] [] ]
@@ -685,7 +686,7 @@ aisleView aisle =
                             " - "
 
                         Number n ->
-                            toString n
+                            String.fromInt n
     in
         text aisleText
 
@@ -700,7 +701,7 @@ checkoutView items =
             items |> List.filter (\i -> i.required && i.purchased) |> List.length
     in
         div []
-            [ h2 [] [ text ("Purchased: " ++ (toString purchased) ++ " of " ++ (toString required)) ]
+            [ h2 [] [ text ("Purchased: " ++ (String.fromInt purchased) ++ " of " ++ (String.fromInt required)) ]
             , hr [] []
             , button [ onClick DoCheckout ] [ text "Do Checkout" ]
             ]
@@ -727,11 +728,20 @@ radio msg name isChecked =
 -- MAIN
 
 
-main : Program Never Model Msg
+-- main : Program Never Model Msg
 main =
-    Html.program
+    Browser.element
         { init = init
         , view = view
         , update = update
         , subscriptions = (always Sub.none)
         }
+
+errorToString : Error -> String
+errorToString error = 
+    case error of
+        Http.BadUrl url -> "Bad URL" ++ url
+        Http.Timeout -> "Timeout"
+        Http.NetworkError -> "Network Error"
+        Http.BadStatus response -> "Bad status (that I ought to explain)"
+        Http.BadPayload message response -> "Bad payload" ++ message ++ " need to add info from response"
