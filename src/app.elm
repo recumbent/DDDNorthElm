@@ -14,7 +14,7 @@ import RemoteData exposing (..)
 import Http exposing (Error)
 import Json.Decode exposing (Decoder, decodeValue, succeed, string, list)
 import Aisle exposing (..)
-import FontAwesome exposing (useSvg, iconWithOptions, edit)
+import FeatherIcons
 
 
 
@@ -499,8 +499,7 @@ onEnter msg =
 view : Model -> Html Msg
 view model =
     div []
-        [ useSvg
-        , h1 [] [ text "Shopping list" ]
+        [ h1 [] [ text "Shopping list" ]
         , viewSelector model.currentView
         , case model.items of
             NotAsked ->
@@ -575,7 +574,7 @@ itemView item =
         [ td [] [ text (String.fromInt item.id) ]
         , td [] 
             [ text item.name
-            , a [] [ iconWithOptions edit FontAwesome.Regular [ FontAwesome.HasFixedWidth ] [] ]
+            , a [] [ FeatherIcons.edit2 |> FeatherIcons.withSize 16 |> FeatherIcons.toHtml [] ]
             ] 
         , td [] [ input [ type_ "checkbox", (checked item.required), onCheck (ToggleRequired item.id) ] [] ]
         ]
